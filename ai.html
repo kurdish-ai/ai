@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="ckb" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ئیئایی کوردی</title>
+    <!-- ADDED FAVICON: The sun emoji (☀️), symbolizing light/knowledge and a central element of the Kurdish identity. -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☀️</text></svg>">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        
+        // ------------------ IMAGE ASSETS (Standard Google "G" Logo SVG) ------------------
+        // Using the simplified, recognizable Google 'G' icon.
+        const defaultGoogleLogoSvg = `
+            <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#4285F4" d="M22.5 12.5c0-.62-.05-1.22-.16-1.8H12v3.38h6.15c-.25 1.4-.99 2.58-2.14 3.46v2.77h3.58c2.09-1.93 3.3-4.75 3.3-8.01z"/>
+                <path fill="#34A853" d="M12 23c3.21 0 5.91-1.07 7.88-2.92l-3.58-2.77c-.99.66-2.29 1.05-4.3 1.05-3.32 0-6.13-2.2-7.14-5.18H1.32v2.85C3.38 20.48 7.42 23 12 23z"/>
+                <path fill="#FBBC05" d="M4.86 14.15c-.47-1.42-.47-2.92 0-4.34V6.96H1.32c-1.3 2.58-1.3 5.56 0 8.14l3.54-2.95z"/>
+                <path fill="#EA4335" d="M12 4.67c1.77 0 3.37.6 4.62 1.77l3.15-3.15C17.91 1.44 15.21 0 12 0 7.42 0 3.38 2.52 1.32 6.96l3.54 2.85c1.01-2.98 3.82-5.14 7.14-5.14z"/>
+            </svg>
+        `;
+        const emptyLogoHtml = defaultGoogleLogoSvg; 
+
+        // ------------------ FIREBASE CONFIGURATION (Provided by User) ------------------
+        const userFirebaseConfig = {
+            apiKey: "AIzaSyDoTAMAuFm8h9RFWk_C4BnqtwEis-RGor4",
+            authDomain: "ai-kurdy.firebaseapp.com",
+            projectId: "ai-kurdy",
+            storageBucket: "ai-kurdy.firebasestorage.app",
+            messagingSenderId: "1071066507145",
+            appId: "1:1071066507145:web:46e894ecfab03cecf52358",
+            measurementId: "G-044ZEW6C0G"
+        };
+        
+        // ------------------ FIREBASE IMPORTS ------------------
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, onSnapshot, addDoc, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // setLogLevel('Debug'); // Uncomment for detailed debugging
+
+        // ------------------ GLOBAL VARIABLES FROM ENVIRONMENT ------------------
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // Use the explicit configuration provided by the user
+        const firebaseConfig = userFirebaseConfig; 
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app, auth, db;
+        let userId = null;
+        const WELCOME_MESSAGE_TEXT = 'بەخێربێیت! من ئیئایی کوردی جێمینیم. چۆن دەتوانم یارمەتیت بدەم؟';
+
+        
+        // ------------------ GEMINI SETUP ------------------
+        import { GoogleGenAI } from "https://esm.run/@google/genai";
+        // User-provided API Key is now set here:
+        const apiKey = "AIzaSyDNc6-bEE5GpFt5uq_nTkQKAZPXjuKiXSw"; 
+        let chat = null;
+
+        // ------------------ UI ELEMENTS ------------------
+        const chatContainer = document.getElementById('chat-container');
+        const authContainer = document.getElementById('auth-container');
+        const messageArea = document.getElementById('message-area');
+        const inputField = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const userIdDisplay = document.getElementById('user-id-display');
+        const loadHistoryButton = document.getElementById('load-history-button');
+
+        // ------------------ TTS UTILITY FUNCTIONS (For raw PCM audio conversion) ------------------
+
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        // Converts signed 16-bit PCM data into a playable WAV Blob
+        function pcmToWav(pcm16, sampleRate = 24000) {
+            const numChannels = 1;
+            const bytesPerSample = 2; // 16-bit
+            const blockAlign = numChannels * bytesPerSample;
+            const byteRate = sampleRate * blockAlign;
+            const dataLength = pcm16.length * bytesPerSample;
+
+            const buffer = new ArrayBuffer(44 + dataLength);
+            const view = new DataView(buffer);
+
+            // RIFF chunk
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + dataLength, true); // ChunkSize
+            writeString(view, 8, 'WAVE');
+
+            // FMT sub-chunk
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);  // Subchunk1Size (16 for PCM)
+            view.setUint16(20, 1, true);   // AudioFormat (1 for PCM)
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, byteRate, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, 16, true);  // BitsPerSample
+
+            // Data sub-chunk
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataLength, true);
+
+            // Write PCM data
+            let offset = 44;
+            for (let i = 0; i < pcm16.length; i++, offset += 2) {
+                view.setInt16(offset, pcm16[i], true); // PCM is Signed 16-bit Little Endian
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+
+        // ------------------ LLM TTS FEATURE ------------------
+
+        // Custom function to replace alert()
+        function alertMessage(title, message) {
+            const existingAlert = document.getElementById('custom-alert');
+            if (existingAlert) existingAlert.remove();
+
+            const alertDiv = document.createElement('div');
+            alertDiv.id = 'custom-alert';
+            alertDiv.className = 'custom-alert';
+            alertDiv.innerHTML = `
+                <div class="alert-content">
+                    <div class="alert-title">${title}</div>
+                    <p>${message}</p>
+                    <button onclick="document.getElementById('custom-alert').remove()">باشە</button>
+                </div>
+            `;
+            document.body.appendChild(alertDiv);
+        }
+
+        window.playTTS = async (text, ttsButton) => {
+            const originalIcon = ttsButton.innerHTML;
+            // Show loading state
+            ttsButton.innerHTML = '<i class="material-icons rotating-icon">sync</i> loading...';
+            ttsButton.disabled = true;
+
+            const voiceName = "Kore"; // A firm, clear voice.
+
+            const payload = {
+                contents: [{
+                    // Explicitly ask the model to speak in Sorani Kurdish, even though the text is already Kurdish.
+                    parts: [{ text: `Say this in a clear, friendly voice, in Sorani Kurdish: ${text}` }] 
+                }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: voiceName }
+                        }
+                    }
+                },
+            };
+            
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+            try {
+                // Implement exponential backoff for API call robustness
+                let response = null;
+                let delay = 1000;
+                for (let i = 0; i < 3; i++) {
+                    try {
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (response.ok) break;
+                    } catch (e) {
+                        console.warn(`TTS fetch failed (attempt ${i + 1}). Retrying in ${delay / 1000}s...`, e);
+                    }
+                    if (i < 2) await new Promise(resolve => setTimeout(resolve, delay *= 2));
+                }
+                
+                if (!response || !response.ok) throw new Error("TTS API call failed after retries.");
+
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
+                    const rateMatch = mimeType.match(/rate=(\d+)/);
+                    const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+                    
+                    const pcmDataBuffer = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmDataBuffer);
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+
+                    // Cleanup when playback finishes
+                    audio.onended = () => {
+                        URL.revokeObjectURL(audioUrl); 
+                        ttsButton.innerHTML = originalIcon;
+                        ttsButton.disabled = false;
+                    };
+
+                    audio.onerror = (e) => {
+                        console.error("Audio playback error:", e);
+                        alertMessage('هەڵەی لێدانی دەنگ', 'ناتوانرێت دەنگەکە لێبدرێت. ڕەنگە فۆرماتەکە کێشەی هەبێت.');
+                        ttsButton.innerHTML = originalIcon;
+                        ttsButton.disabled = false;
+                    };
+                    
+                } else {
+                    console.error("Invalid TTS response structure or missing audio data.", result);
+                    alertMessage('هەڵەی دەنگ', 'هیچ دەنگێک نەدۆزرایەوە یان فۆرماتەکە هەڵەیە.');
+                }
+            } catch (error) {
+                console.error("TTS generation error:", error);
+                alertMessage('هەڵەی گشتی', 'کێشەیەک لە دروستکردنی دەنگەکە ڕوویدا. هۆکار: ' + error.message);
+            } finally {
+                // Reset button state if not already handled
+                if (ttsButton.disabled && !ttsButton.innerHTML.includes('sync')) {
+                    ttsButton.innerHTML = originalIcon;
+                    ttsButton.disabled = false;
+                }
+            }
+        };
+
+
+        // ------------------ FIREBASE INITIALIZATION ------------------
+        function initializeFirebase() {
+            if (!firebaseConfig.apiKey) {
+                console.error("Firebase config is missing or incomplete. Authentication will not work.");
+                document.getElementById('auth-error').textContent = "هەڵە: ڕێکخستنەکانی فایەربەیس نادروستن.";
+                return;
+            }
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app); // Initialize Firestore
+            
+            setupAuthListener();
+            handleInitialAuth();
+        }
+
+        // Handles the mandatory custom token sign-in attempt from the environment.
+        async function handleInitialAuth() {
+            if (initialAuthToken) {
+                try {
+                    // 1. Try signing in with the system-provided custom token (if available)
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } catch (error) {
+                    // If custom token fails, log it.
+                    console.error("Custom token sign-in failed (system environment issue). User must now choose sign-in method.", error);
+                }
+            }
+        }
+
+        // ------------------ AUTHENTICATION METHODS ------------------
+
+        // Google Sign-In
+        window.signInWithGoogle = async () => {
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("Google Sign-In failed:", error);
+                alertMessage('هەڵەی چوونەژوورەوە', `هەڵەی چوونەژوورەوەی گووگڵ: ${error.message}`);
+            }
+        };
+
+        // Anonymous Sign-In (Now exposed on the UI again)
+        window.signInAnonymouslyUser = async () => {
+            try {
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Anonymous Sign-In failed:", error);
+                alertMessage('هەڵەی چوونەژوورەوە', `هەڵەی چوونەژوورەوەی بێناو: ${error.message}`);
+            }
+        };
+        
+        // Function to check if the current user is signed in with Google
+        function isGoogleUser(user) {
+            return user && user.providerData && user.providerData.some(p => p.providerId === 'google.com');
+        }
+
+        // ------------------ AUTH STATE LISTENER & UI MANAGEMENT ------------------
+        function setupAuthListener() {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    // User is signed in. SHOW CHAT.
+                    userId = user.uid;
+                    // Minimized display of user ID
+                    userIdDisplay.textContent = `ناسنامەی بەکارهێنەر: ${userId}`; 
+                    showAuthScreen(false);
+                    initializeChat(user);
+                } else {
+                    // User is signed out. SHOW AUTH CHOICE.
+                    userId = null;
+                    userIdDisplay.textContent = 'ناسنامەی بەکارهێنەر: بێناو';
+                    showAuthScreen(true);
+                }
+            });
+        }
+
+        function showAuthScreen(show) {
+            authContainer.style.display = show ? 'flex' : 'none';
+            chatContainer.style.display = show ? 'none' : 'flex';
+        }
+        
+        // ------------------ HISTORY BUTTON VISIBILITY ------------------
+        function toggleHistoryButton(show) {
+            if (loadHistoryButton) {
+                // Ensure it is flex when shown to maintain alignment
+                loadHistoryButton.style.display = show ? 'flex' : 'none'; 
+            }
+        }
+
+
+        // ------------------ FIRESTORE HISTORY LOGIC ------------------
+
+        function getChatCollectionRef() {
+            // Path for public data: /artifacts/{appId}/public/data/{your_collection_name}
+            const collectionName = 'chat_history';
+            const publicPath = `/artifacts/${appId}/public/data/${collectionName}`;
+            return collection(db, publicPath);
+        }
+
+        function loadChatHistory() {
+            // Only query documents belonging to this userId
+            const q = query(
+                getChatCollectionRef(),
+                where('userId', '==', userId)
+            );
+
+            // Use onSnapshot for real-time history
+            onSnapshot(q, (snapshot) => {
+                // Clear all existing messages 
+                messageArea.innerHTML = ''; 
+                appendMessage('ai', WELCOME_MESSAGE_TEXT, false);
+
+                let chatMessages = [];
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    if (data.timestamp && data.text && data.text !== WELCOME_MESSAGE_TEXT) {
+                         chatMessages.push({ ...data, id: doc.id });
+                    }
+                });
+                
+                // Client-side sort by timestamp
+                chatMessages.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+
+                chatMessages.forEach(msg => {
+                    appendMessage(msg.role, msg.text, false);
+                });
+                messageArea.scrollTop = messageArea.scrollHeight;
+            }, (error) => {
+                console.error("Error loading chat history:", error);
+            });
+        }
+
+
+        // ------------------ GEMINI CHAT LOGIC ------------------
+
+        function initializeChat(user) {
+            // Re-initialize chat session when user changes (e.g., from anon to Google)
+            chat = new GoogleGenAI({ apiKey }).chats.create({ 
+                model: "gemini-2.5-flash", 
+                systemInstruction: "You are a helpful, conversational AI assistant. Respond fluently and exclusively in Kurdish Sorani (زاراوه‌ی كوردی سۆرانی) using the Perso-Arabic script.",
+                // Enable Google Search tool for grounded responses
+                config: {
+                    tools: [{ google_search: {} }]
+                }
+            });
+            
+            // Clear old messages and add a new welcome message specific to this session
+            messageArea.innerHTML = '';
+            appendMessage('ai', WELCOME_MESSAGE_TEXT, false);
+
+            inputField.disabled = false;
+            sendButton.disabled = false;
+            inputField.focus();
+
+            // Load history only if they are signed in with Google
+            const isGoogleAuth = isGoogleUser(user);
+            
+            // Toggle the button visibility
+            toggleHistoryButton(isGoogleAuth); 
+
+            if (db && isGoogleAuth) {
+                // Attach event listener to the history button
+                loadHistoryButton.onclick = loadChatHistory; 
+                // Load history automatically on sign-in 
+                loadChatHistory();
+            }
+
+            // Set up event listeners for the chat UI
+            sendButton.onclick = sendMessage;
+            inputField.onkeypress = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault(); 
+                    sendMessage();
+                }
+            };
+        }
+
+        // Function to create and append a new message to the chat
+        function appendMessage(sender, text, scroll = true) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', sender);
+            
+            const iconHTML = sender === 'ai' ? '<div class="icon">🤖</div>' : '<div class="icon">ت</div>';
+            
+            // Text content container
+            const contentDiv = document.createElement('div');
+            contentDiv.classList.add('text-content');
+            contentDiv.innerHTML = text; // Initial text/loading state
+
+            if (sender === 'ai') {
+                // For AI messages, create a container for text + TTS button
+                const ttsButton = document.createElement('button');
+                ttsButton.classList.add('tts-button');
+                ttsButton.innerHTML = '<i class="material-icons">volume_up</i> ✨گوێگرتن'; // Kurdish
+                ttsButton.title = 'گوێگرتن بە دەنگی جێمینی'; // Kurdish
+
+                const bubbleContent = document.createElement('div');
+                bubbleContent.classList.add('ai-bubble-content');
+                
+                // Add text and button inside a wrapping div
+                bubbleContent.appendChild(contentDiv);
+                bubbleContent.appendChild(ttsButton);
+
+                // Construct messageDiv for AI (Icon on the right, Bubble content on the left)
+                messageDiv.innerHTML = iconHTML;
+                messageDiv.appendChild(bubbleContent);
+                messageDiv.style.alignSelf = 'flex-start'; 
+                
+            } else {
+                 // Regular User Message (Bubble on the right, Icon on the left in RTL)
+                 messageDiv.innerHTML = contentDiv.outerHTML + iconHTML;
+                 messageDiv.style.flexDirection = 'row-reverse';
+                 messageDiv.style.alignSelf = 'flex-end';
+            }
+            
+            messageArea.appendChild(messageDiv);
+            if (scroll) {
+                messageArea.scrollTop = messageArea.scrollHeight;
+            }
+            // Return the element containing the text (for the sender to update the '...' to the final text)
+            return contentDiv;
+        }
+
+        // Function to send the message to Gemini and save it
+        async function sendMessage() {
+            const prompt = inputField.value.trim();
+            if (prompt === "" || !chat) return;
+            
+            const isGoogleAuth = isGoogleUser(auth.currentUser);
+
+            // 1. Add user message to the UI
+            appendMessage('user', prompt);
+            inputField.value = '';
+            inputField.disabled = true;
+            sendButton.disabled = true;
+
+            // 1.5. SAVE USER MESSAGE TO FIRESTORE (only for Google users)
+            if (userId && db && isGoogleAuth) {
+                 try {
+                    await addDoc(getChatCollectionRef(), {
+                        userId: userId,
+                        role: 'user',
+                        text: prompt,
+                        timestamp: serverTimestamp()
+                    });
+                } catch (e) {
+                    console.error("Error adding user message to history:", e);
+                }
+            }
+
+
+            // 2. Add a loading indicator for the AI's response
+            const aiMessageContent = appendMessage('ai', '...');
+            let aiResponseText = '';
+            
+            try {
+                // 3. Call the Gemini API 
+                // Google Search tool is configured in initializeChat
+                const response = await chat.sendMessage({ message: prompt });
+                aiResponseText = response.text;
+                
+                // 4. Update the UI with the actual response
+                aiMessageContent.innerHTML = aiResponseText;
+
+                // 4.5. SAVE AI MESSAGE TO FIRESTORE (only for Google users)
+                if (userId && db && isGoogleAuth) {
+                     try {
+                        await addDoc(getChatCollectionRef(), {
+                            userId: userId,
+                            role: 'ai',
+                            text: aiResponseText,
+                            timestamp: serverTimestamp()
+                        });
+                    } catch (e) {
+                        console.error("Error adding AI message to history:", e);
+                    }
+                }
+
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                aiMessageContent.innerHTML = '<strong>هه‌ڵه‌:</strong> ببوره‌، په‌یوه‌ندی له‌گه‌ڵ جێمینی پچڕا. سه‌یری کۆنسۆڵەکە بکه‌ بۆ زانیاری زیاتر.';
+            } finally {
+                // 5. Re-enable input
+                inputField.disabled = false;
+                sendButton.disabled = false;
+                inputField.focus();
+                messageArea.scrollTop = messageArea.scrollHeight;
+
+                // --- NEW TTS BUTTON UPDATE LOGIC ---
+                // Find and update the button's onclick handler since the text has changed
+                if (aiResponseText) {
+                    const ttsButton = aiMessageContent.closest('.ai-bubble-content')?.querySelector('.tts-button');
+                    if (ttsButton) {
+                        ttsButton.onclick = () => window.playTTS(aiResponseText, ttsButton);
+                    }
+                }
+                // --- END NEW TTS BUTTON UPDATE LOGIC ---
+            }
+        }
+
+        // Start the application after the DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Inject default logo SVG into the button placeholder
+            const placeholder = document.getElementById('google-icon-placeholder');
+            if (placeholder) {
+                placeholder.innerHTML = emptyLogoHtml;
+            }
+            initializeFirebase();
+        });
+
+    </script>
+    <style>
+        /* General Setup - Apple-like Aesthetics */
+        :root {
+            --primary-ios-blue: #007AFF;
+            --background-light: #F2F2F7; /* Light gray background */
+            --card-background: #FFFFFF;
+            --text-dark: #1D1D1F; /* Dark gray for text */
+            --border-color: #D1D1D6;
+            --bubble-ai: #E5E5EA; /* Light gray received bubble */
+            --subtle-gray: #6D6D72;
+            --warning-red: #FF3B30;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+            background-color: var(--background-light); 
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            color: var(--text-dark);
+            font-weight: 500; /* Bolder base font */
+        }
+
+        /* Custom Alert Modal */
+        .custom-alert {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .alert-content {
+            background: var(--card-background);
+            padding: 20px 30px;
+            border-radius: 12px;
+            text-align: right;
+            max-width: 90%;
+            direction: rtl;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .alert-title {
+            font-weight: 700;
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: var(--warning-red);
+        }
+
+        .alert-content p {
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .alert-content button {
+            background-color: var(--primary-ios-blue);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            float: left; /* Aligns button to the left in RTL context */
+            transition: opacity 0.2s;
+        }
+        .alert-content button:hover {
+            opacity: 0.9;
+        }
+
+        /* Container Styles */
+        .chat-container, .auth-container {
+            width: 100%;
+            max-width: 700px; 
+            height: 100%;
+            background-color: var(--card-background);
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); 
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            margin-top: 15px;
+            margin-bottom: 15px;
+        }
+        @media (max-width: 800px) {
+            .chat-container, .auth-container {
+                border-radius: 0;
+                margin: 0;
+                box-shadow: none;
+            }
+        }
+
+        /* AUTH SCREEN STYLES */
+        .auth-container {
+            justify-content: center;
+            align-items: center;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .auth-card {
+            background-color: var(--card-background);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); 
+            width: 100%;
+            max-width: 350px;
+        }
+
+        .auth-card h2 {
+            margin-bottom: 30px;
+            font-size: 26px; 
+            font-weight: 700; 
+            color: var(--text-dark);
+        }
+
+        .auth-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 12px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 17px; 
+            font-weight: 600; 
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        /* Google Logo Styling (Applies to both SVG and <img>) */
+        .google-icon {
+            width: 20px;
+            height: 20px;
+            margin-left: 10px;
+            flex-shrink: 0;
+            object-fit: contain;
+        }
+        
+        .auth-button:hover {
+            opacity: 0.9;
+            transform: translateY(-3px); 
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1); 
+        }
+        .auth-button:active {
+            transform: translateY(0); 
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Black background for Google Sign-In */
+        .google-btn {
+            background-color: var(--text-dark); 
+            color: white;
+            margin-bottom: 30px; 
+        }
+        
+        /* New Separator Style */
+        .separator {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 15px 0;
+            color: var(--subtle-gray);
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .separator::before,
+        .separator::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .separator:not(:empty)::before {
+            margin-left: .5em;
+        }
+        .separator:not(:empty)::after {
+            margin-right: .5em;
+        }
+        
+        /* Dark Grey background for Anonymous Sign-In */
+        .anon-btn {
+            background-color: #64646a; 
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .auth-info {
+            margin-top: 20px;
+            font-size: 14px;
+            color: var(--subtle-gray); 
+        }
+
+        /* Header (for both Auth and Chat) */
+        .header {
+            padding: 15px 20px;
+            background-color: var(--card-background);
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-dark);
+            display: flex;
+            justify-content: space-between; 
+            align-items: center;
+            direction: rtl; 
+        }
+        
+        /* --- NEW ACTION BUTTON STYLE --- */
+        .action-button {
+            background: none;
+            border: none;
+            color: var(--primary-ios-blue);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        .action-button:hover {
+            background-color: rgba(0, 122, 255, 0.1); /* Light blue hover */
+        }
+        .action-button i {
+            font-size: 20px;
+            margin-left: 5px; /* Adjust margin for RTL */
+        }
+        
+        /* Minimized User ID Display */
+        #user-id-display {
+            font-size: 10px; /* Very small */
+            font-weight: 400; 
+            color: #C7C7CC; /* Faded color */
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            max-width: 150px; /* Ensure it stays small */
+        }
+        
+        /* Message Area - The scrollable history */
+        .message-area {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            direction: rtl; 
+        }
+
+        /* --- CHAT ANIMATION CSS --- */
+        @keyframes slideInFromBottom {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Individual Messages */
+        .message {
+            display: flex;
+            margin-bottom: 10px; 
+            line-height: 1.6;
+            max-width: 90%;
+            align-items: flex-end; 
+            animation: slideInFromBottom 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+        }
+        
+        /* Message Icons (User/AI) - Cleaned up icons */
+        .icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: white;
+            flex-shrink: 0;
+            font-weight: 700;
+        }
+        /* AI (Right side in RTL) */
+        .ai { justify-content: flex-end; align-self: flex-end; margin-left: auto; margin-right: 0;}
+        .ai .icon {
+            background-color: #64646a; 
+            margin-right: 8px; 
+            margin-left: 0;
+        }
+        /* User (Left side in RTL) */
+        .user {
+            justify-content: flex-start;
+            align-self: flex-start; 
+            text-align: right;
+            margin-right: 0; 
+            margin-left: auto; 
+        }
+        .user .icon {
+            background-color: var(--primary-ios-blue); 
+            margin-left: 8px; 
+            margin-right: 0; 
+        }
+        
+        /* The actual text content bubble */
+        .text-content {
+            padding: 10px 14px;
+            border-radius: 18px; 
+            font-size: 17px; 
+            font-weight: 600; 
+        }
+
+        .ai .text-content {
+            background-color: var(--bubble-ai); 
+            color: var(--text-dark);
+            border-bottom-left-radius: 4px; 
+        }
+
+        .user .text-content {
+            background-color: var(--primary-ios-blue); 
+            color: white;
+            border-bottom-right-radius: 4px; 
+        }
+
+        /* NEW: AI Bubble Wrapper for Text + Button */
+        .ai-bubble-content {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end; /* Align elements to the right edge */
+        }
+        .ai-bubble-content .text-content {
+            margin-bottom: 5px; /* Space between text and button */
+        }
+        
+        /* NEW: TTS Button Styles */
+        .tts-button {
+            background: var(--card-background);
+            color: var(--primary-ios-blue);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 5px 10px;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            /* Important to prevent the text from wrapping */
+            white-space: nowrap; 
+        }
+        .tts-button i {
+            font-size: 18px;
+            margin-left: 5px; /* Space icon from text */
+            margin-right: -2px; 
+        }
+        .tts-button:hover:not(:disabled) {
+            background-color: #F0F0F5;
+            transform: translateY(-1px);
+        }
+        .tts-button:disabled {
+            opacity: 0.6;
+            cursor: progress;
+        }
+
+        /* NEW: Loading Indicator for TTS */
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .rotating-icon {
+            animation: rotate 1s linear infinite;
+        }
+        
+        /* Input Area - The prompt bar at the bottom */
+        .input-area {
+            border-top: 1px solid var(--border-color);
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            background-color: var(--card-background);
+            direction: rtl;
+        }
+
+        .input-area input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            font-size: 16px; 
+            outline: none;
+            text-align: right; 
+            margin-left: 10px;
+            transition: border-color 0.2s ease-in-out;
+        }
+        .input-area input:focus {
+            border-color: var(--primary-ios-blue);
+        }
+
+        .input-area button {
+            background-color: var(--primary-ios-blue);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .input-area button:hover:not(:disabled) {
+            opacity: 0.8;
+            transform: scale(1.1); 
+        }
+        .input-area button:active:not(:disabled) {
+            transform: scale(0.9); 
+            opacity: 1;
+        }
+        .input-area button:disabled {
+            background-color: #D1D1D6;
+            cursor: not-allowed;
+            transition: background-color 0.2s ease-in-out; 
+        }
+    </style>
+</head>
+<body>
+    <!-- -------------------- Authentication Screen -------------------- -->
+    <div id="auth-container" class="auth-container" style="display: flex;">
+        <div class="auth-card">
+            <h2>چوونەژوورەوە بۆ ئیئایی کوردی</h2>
+            <p id="auth-error" class="auth-info" style="color: var(--warning-red);"></p>
+
+            <button class="auth-button google-btn" onclick="signInWithGoogle()">
+                <span id="google-icon-placeholder"></span>
+                چوونەژوورەوە بە گووگڵ
+            </button>
+            
+            <div class="separator">یان</div> 
+
+            <button class="auth-button anon-btn" onclick="signInAnonymouslyUser()">
+                <i class="material-icons">visibility_off</i>
+                چوونەژوورەوەی بێناو
+            </button>
+
+            <p class="auth-info" style="margin-top: 20px;">
+                تێبینی: چوونەژوورەوە بە گووگڵ گفتوگۆکانت خەزن دەکات.
+            </p>
+        </div>
+    </div>
+
+    <!-- -------------------- Main Chat Application -------------------- -->
+    <div id="chat-container" class="chat-container" style="display: none;">
+        
+        <!-- Header with Minimized User Info -->
+        <div class="header">
+            <!-- HISTORY BUTTON -->
+            <button id="load-history-button" class="action-button" style="display: none;">
+                <i class="material-icons">history</i>
+                گفتوگۆی پێشوو
+            </button>
+            
+            <!-- User ID is minimized and placed alone in the header -->
+            <span id="user-id-display">ناسنامەی بەکارهێنەر: بێناو</span>
+        </div>
+        
+        <!-- Message History -->
+        <div id="message-area" class="message-area">
+            <!-- Messages and history will be added here by JavaScript -->
+        </div>
+
+        <!-- Input Bar -->
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="هەر پرسیارێکت هەیە لە جێمینی بکە..." disabled>
+            <button id="send-button" disabled>
+                <i class="material-icons">send</i>
+            </button>
+        </div>
+    </div>
+</body>
+</html>
