@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ئیئایی کوردی - Gemini Chat</title>
+    <title>ئیئایی کوردی </title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☀️</text></svg>">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* General Setup - Apple-like Aesthetics */
+        /* General Setup - Black & Gray Aesthetic */
         :root {
-            --primary-ios-blue: #007AFF;
+            --primary-black: #000000;
+            --secondary-gray: #4A4A4A;
+            --primary-blue: #007AFF; /* Used for the new link style */
             --background-light: #F2F2F7; /* Light gray background */
             --card-background: #FFFFFF;
             --text-dark: #1D1D1F; /* Dark gray for text */
@@ -18,6 +20,7 @@
             --bubble-ai: #E5E5EA; /* Light gray received bubble */
             --subtle-gray: #6D6D72;
             --warning-red: #FF3B30;
+            --chat-bubble-user: #1A1A1A; /* Dark gray/black for user bubble */
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
@@ -69,7 +72,7 @@
         }
 
         .alert-content button {
-            background-color: var(--primary-ios-blue);
+            background-color: var(--primary-black);
             color: white;
             border: none;
             padding: 10px 20px;
@@ -145,7 +148,8 @@
             cursor: pointer;
             font-size: 17px; 
             font-weight: 600; 
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            /* **SMOOTH ANIMATION CHANGE** */
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
         }
 
         .google-icon {
@@ -157,25 +161,27 @@
         }
         
         .auth-button:hover {
-            opacity: 0.9;
-            transform: translateY(-3px); 
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1); 
+            /* **SMOOTH ANIMATION CHANGE** */
+            opacity: 0.95; 
+            transform: translateY(-5px); 
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2); 
         }
         .auth-button:active {
-            transform: translateY(0); 
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            /* **SMOOTH ANIMATION CHANGE** */
+            transform: translateY(-1px); 
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); 
         }
 
         .google-btn {
-            background-color: var(--primary-ios-blue); /* Changed to blue for prominence */ 
+            background-color: var(--primary-black); /* BLACK */ 
             color: white;
             margin-bottom: 30px; 
         }
         
         .anonymous-btn {
-            background-color: var(--bubble-ai); /* Light gray */
-            color: var(--text-dark);
-            border: 1px solid var(--border-color);
+            background-color: var(--secondary-gray); /* DARK GRAY */
+            color: white;
+            border: 1px solid var(--primary-black);
         }
 
         .separator {
@@ -240,31 +246,38 @@
             transition: background-color 0.2s;
             border: none;
         }
-
-        #logout-button {
-            background-color: var(--warning-red);
-            color: white;
-            display: none; 
+        
+        /* Link Google Button Styling */
+        #upgrade-button {
+            background-color: transparent; 
+            color: var(--primary-blue); 
+            border: none;
+            padding: 8px 0; 
+            text-decoration: underline; 
+            font-weight: 500; 
+            transition: color 0.2s;
+        }
+        #upgrade-button:hover {
+            opacity: 1; 
+            color: #0056b3; 
         }
 
-        #upgrade-button {
-            background-color: #34A853; /* Google Green */
+        #logout-button {
+            background-color: var(--warning-red); 
             color: white;
-            display: none; 
         }
 
         #load-history-button {
-            background-color: #FBBC05; /* Google Yellow */
-            color: var(--text-dark);
-            display: none; 
+            background-color: var(--secondary-gray); 
+            color: white;
         }
         
         .header-button i {
             margin-left: 5px;
             font-size: 18px;
         }
-        .header-button:hover {
-            opacity: 0.9;
+        .header-button:hover:not(#upgrade-button) {
+            opacity: 0.85;
         }
 
         /* MESSAGE AREA */
@@ -283,7 +296,7 @@
             display: flex;
             align-items: flex-start;
             max-width: 90%;
-            direction: rtl; /* Sets the base direction for the message container */
+            direction: rtl; 
         }
         
         .message .icon {
@@ -298,8 +311,9 @@
             font-weight: normal; 
         }
 
+        /* User Bubble/Icon Update */
         .message.user .icon {
-            background-color: var(--primary-ios-blue);
+            background-color: var(--chat-bubble-user); 
             color: white;
             margin-right: 10px;
             font-family: Arial, sans-serif;
@@ -327,9 +341,9 @@
             max-width: 100%;
         }
 
-        /* User Bubble */
+        /* User Bubble Update */
         .message.user .text-content {
-            background-color: var(--primary-ios-blue);
+            background-color: var(--chat-bubble-user); 
             color: white;
             padding: 10px 15px;
             border-radius: 18px;
@@ -355,7 +369,7 @@
             cursor: pointer;
             transition: background-color 0.2s;
             width: fit-content;
-            align-self: flex-start; /* Aligns button to the right in RTL */
+            align-self: flex-start; 
         }
         .tts-button:hover {
             background-color: white;
@@ -400,11 +414,12 @@
             font-family: inherit;
         }
 
+        /* Send Button Update */
         #send-button {
             width: 40px;
             height: 40px;
             border-radius: 50%;
-            background-color: var(--primary-ios-blue);
+            background-color: var(--primary-black); 
             color: white;
             border: none;
             cursor: pointer;
@@ -415,7 +430,7 @@
             flex-shrink: 0;
         }
         #send-button:hover:not(:disabled) {
-            background-color: #0066CC; 
+            background-color: var(--secondary-gray); 
         }
         #send-button:disabled {
             background-color: var(--subtle-gray); 
@@ -434,13 +449,13 @@
     </style>
     <script type="module">
         
-        // ------------------ IMAGE ASSETS (Standard Google "G" Logo SVG) ------------------
+        // ------------------ IMAGE ASSETS (Updated Google "G" Logo SVG) ------------------
         const defaultGoogleLogoSvg = `
-            <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path fill="#4285F4" d="M22.5 12.5c0-.62-.05-1.22-.16-1.8H12v3.38h6.15c-.25 1.4-.99 2.58-2.14 3.46v2.77h3.58c2.09-1.93 3.3-4.75 3.3-8.01z"/>
-                <path fill="#34A853" d="M12 23c3.21 0 5.91-1.07 7.88-2.92l-3.58-2.77c-.99.66-2.29 1.05-4.3 1.05-3.32 0-6.13-2.2-7.14-5.18H1.32v2.85C3.38 20.48 7.42 23 12 23z"/>
-                <path fill="#FBBC05" d="M4.86 14.15c-.47-1.42-.47-2.92 0-4.34V6.96H1.32c-1.3 2.58-1.3 5.56 0 8.14l3.54-2.95z"/>
-                <path fill="#EA4335" d="M12 4.67c1.77 0 3.37.6 4.62 1.77l3.15-3.15C17.91 1.44 15.21 0 12 0 7.42 0 3.38 2.52 1.32 6.96l3.54 2.85c1.01-2.98 3.82-5.14 7.14-5.14z"/>
+            <svg class="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+                <path fill="#4285F4" d="M24 9.5c3.08 0 5.46 1.34 6.74 2.58l5.8-5.8c-3.66-3.41-8.5-5.28-12.54-5.28C11.51 1.0 0 12.51 0 24s11.51 23 24 23c6.91 0 11.45-2.54 15.3-6.42l-5.8-5.8c-2.32 2.32-5.78 3.82-9.5 3.82-7.22 0-13.12-5.9-13.12-13.12s5.9-13.12 13.12-13.12z"/>
+                <path fill="#34A853" d="M47.5 24c0-1.77-.15-3.5-.42-5.18H24v10.16h12.8c-.54 2.66-2.18 4.88-4.72 6.36l5.8 5.8c3.58-3.32 5.6-8.2 5.6-14.12z"/>
+                <path fill="#FBBC05" d="M10.88 28.5c-.24-1.12-.37-2.31-.37-3.5s.13-2.38.37-3.5L4.85 17.5c-1.8 3.55-2.85 7.63-2.85 11.5s1.05 7.95 2.85 11.5l6.03-4.99z"/>
+                <path fill="#EA4335" d="M24 10.92c3.08 0 5.46 1.34 6.74 2.58l5.8-5.8c-3.66-3.41-8.5-5.28-12.54-5.28C11.51 2.42 0 13.93 0 25.42h10.88c0-7.22 5.9-13.12 13.12-13.12z"/>
             </svg>
         `;
         const emptyLogoHtml = defaultGoogleLogoSvg; 
@@ -462,10 +477,9 @@
         import { getFirestore, collection, query, onSnapshot, addDoc, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // ------------------ GLOBAL VARIABLES FROM ENVIRONMENT ------------------
-        // NOTE: These are typically injected by a server environment. Using defaults here.
-        const appId = 'default-ai-kurdy-app-id'; // Replaced runtime __app_id
+        const appId = 'default-ai-kurdy-app-id'; 
         const firebaseConfig = userFirebaseConfig; 
-        const initialAuthToken = null; // Replaced runtime __initial_auth_token
+        const initialAuthToken = null; 
 
         let app, auth, db;
         let userId = null;
@@ -729,7 +743,7 @@
                 const provider = new GoogleAuthProvider();
                 // This links the current anonymous user to a new Google account
                 await linkWithPopup(auth.currentUser, provider);
-                alertMessage('بەرزکردنەوە سەرکەوتوو بوو', 'هەژماری بێناوی ئێستات بە سەرکەوتوویی بەستراوەتەوە بە گووگڵ.');
+                alertMessage('بەستنەوە سەرکەوتوو بوو', 'هەژماری بێناوی ئێستات بە سەرکەوتوویی بەستراوەتەوە بە گووگڵ.');
             } catch (error) {
                 console.error("Account upgrade failed:", error);
                 alertMessage('هەڵەی بەستنەوە', `نەتوانرا ئەکاونتی گووگڵ ببەسترێتەوە: ${error.message}`);
@@ -738,7 +752,6 @@
         
         /**
          * Checks if the user is a persistent user (i.e., NOT anonymous).
-         * This includes Google, Email, and Custom Token users.
          */
         function isPersistentUser(user) {
             return user && !user.isAnonymous;
@@ -746,6 +759,8 @@
 
         // ------------------ AUTH STATE LISTENER & UI MANAGEMENT ------------------
         function setupAuthListener() {
+            let initialLoadDone = false; // Flag to control chat/history initialization
+
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     userId = user.uid;
@@ -757,23 +772,25 @@
 
                     // Manage Header Buttons based on persistence
                     if (isPersistent) {
-                        // Persistent User (Google, Email, Custom)
                         logoutButton.style.display = 'flex';
                         upgradeButton.style.display = 'none';
                         toggleHistoryButton(true); 
                     } else if (isAnonymous) {
-                        // Anonymous User
                         logoutButton.style.display = 'none';
-                        upgradeButton.style.display = 'flex'; // Show upgrade option
+                        upgradeButton.style.display = 'flex'; 
                         toggleHistoryButton(false); 
                     } else {
-                         // Should not happen, but a safe fallback
                         logoutButton.style.display = 'flex';
                         upgradeButton.style.display = 'none';
                         toggleHistoryButton(true);
                     }
 
-                    initializeChat(user);
+                    // Only run initializeChat on first load/change, not on every state check if already initialized
+                    if (!initialLoadDone || userId !== chat?.userId) {
+                        initializeChat(user);
+                        initialLoadDone = true;
+                    }
+
                 } else {
                     userId = null;
                     userIdDisplay.textContent = 'ناسنامەی بەکارهێنەر: بێناو';
@@ -781,6 +798,9 @@
                     
                     if(logoutButton) logoutButton.style.display = 'none';
                     if(upgradeButton) upgradeButton.style.display = 'none';
+                    
+                    // Reset flag on logout
+                    initialLoadDone = false;
                 }
             });
         }
@@ -816,8 +836,9 @@
             );
 
             onSnapshot(q, (snapshot) => {
+                // Clear the message area for the new history load
                 messageArea.innerHTML = ''; 
-                // Welcome message does NOT need a TTS button
+                // Add the initial welcome message first
                 appendMessage('ai', WELCOME_MESSAGE_TEXT, false, false); 
 
                 let chatMessages = [];
@@ -831,7 +852,6 @@
                 chatMessages.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
 
                 chatMessages.forEach(msg => {
-                    // History messages need the language check for the TTS button
                     appendMessage(msg.role, msg.text, false, true); 
                 });
                 messageArea.scrollTop = messageArea.scrollHeight;
@@ -851,7 +871,8 @@
                     tools: [{ google_search: {} }]
                 }
             });
-            
+            chat.userId = user.uid; // Store the user ID on the chat object
+
             messageArea.innerHTML = '';
             // Welcome message does NOT need a TTS button
             appendMessage('ai', WELCOME_MESSAGE_TEXT, false, false);
@@ -865,6 +886,7 @@
             // Set up history button only if authorized (Persistent user: Google, Custom, etc.)
             if (db && isPersistent) {
                 loadHistoryButton.onclick = loadChatHistory; 
+                // Automatically load history on login for persistent users
                 loadChatHistory();
             }
 
@@ -1069,7 +1091,7 @@
             <div class="header-actions">
                 <button id="upgrade-button" onclick="upgradeToGoogle()" class="header-button">
                     <i class="material-icons">link</i>
-                    پاشەکەوتکردن (بەرزکردنەوە)
+                    بەستنەوە بە گووگڵ
                 </button>
                 
                 <button id="load-history-button" class="header-button">
