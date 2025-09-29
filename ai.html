@@ -31,10 +31,9 @@
             measurementId: "G-044ZEW6C0G"
         };
         
-        // ------------------ FIREBASE IMPORTS ------------------
+        // ------------------ FIREBASE IMPORTS (UPDATED to include signInWithCredential) ------------------
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // ADDED linkWithPopup for the upgrade feature
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, linkWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, linkWithPopup, signInWithCredential } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, query, onSnapshot, addDoc, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // ------------------ GLOBAL VARIABLES FROM ENVIRONMENT ------------------
@@ -131,7 +130,7 @@
 
 
         // Custom function to replace alert()
-        function alertMessage(title, message) {
+        window.alertMessage = (title, message) => { // Made global to be accessible in HTML button
             const existingAlert = document.getElementById('custom-alert');
             if (existingAlert) existingAlert.remove();
 
@@ -146,7 +145,116 @@
                 </div>
             `;
             document.body.appendChild(alertDiv);
-        }
+        };
+
+        // ------------------ LLM TTS FEATURE ------------------
+
+        window.playTTS = async (text, ttsButton) => {
+            const originalIcon = ttsButton.innerHTML;
+            // Show loading state
+            ttsButton.innerHTML = '<i class="material-icons rotating-icon">sync</i> loading...';
+            ttsButton.disabled = true;
+
+            const voiceName = "Kore"; 
+
+            const payload = {
+                contents: [{
+                    parts: [{ text: `Say this text, using the appropriate language and tone: ${text}` }] 
+                }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: voiceName }
+                        }
+                    }
+                },
+            };
+            
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+            try {
+                let response = null;
+                let delay = 1000;
+                for (let i = 0; i < 3; i++) {
+                    try {
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (response.ok) break;
+                    } catch (e) {
+                        console.warn(`TTS fetch failed (attempt ${i + 1}). Retrying in ${delay / 1000}s...`, e);
+                    }
+                    if (i < 2) await new Promise(resolve => setTimeout(resolve, delay *= 2));
+                }
+                
+                if (!response || !response.ok) throw new Error("TTS API call failed after retries.");
+
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
+                    const rateMatch = mimeType.match(/rate=(\d+)/);
+                    const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+                    
+                    const pcmDataBuffer = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmDataBuffer);
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+
+                    audio.onended = () => {
+                        URL.revokeObjectURL(audioUrl); 
+                        ttsButton.innerHTML = originalIcon;
+                        ttsButton.disabled = false;
+                    };
+
+                    audio.onerror = (e) => {
+                        console.error("Audio playback error:", e);
+                        alertMessage('هەڵەی لێدانی دەنگ', 'ناتوانرێت دەنگەکە لێبدرێت. ڕەنگە فۆرماتەکە کێشەی هەبێت.');
+                        ttsButton.innerHTML = originalIcon;
+                        ttsButton.disabled = false;
+                    };
+                    
+                } else {
+                    console.error("Invalid TTS response structure or missing audio data.", result);
+                    alertMessage('هەڵەی دەنگ', 'هیچ دەنگێک نەدۆزرایەوە یان فۆرماتەکە هەڵەیە.');
+                }
+            } catch (error) {
+                console.error("TTS generation error:", error);
+                alertMessage('هەڵەی گشتی', 'کێشەیەک لە دروستکردنی دەنگەکە ڕوویدا. هۆکار: ' + error.message);
+            } finally {
+                if (ttsButton.disabled && ttsButton.innerHTML.includes('sync')) {
+                    ttsButton.innerHTML = originalIcon;
+                    ttsButton.disabled = false;
+                }
+            }
+        };
+
+
+        // Custom function to replace alert()
+        window.alertMessage = (title, message) => { // Made global to be accessible in HTML button
+            const existingAlert = document.getElementById('custom-alert');
+            if (existingAlert) existingAlert.remove();
+
+            const alertDiv = document.createElement('div');
+            alertDiv.id = 'custom-alert';
+            alertDiv.className = 'custom-alert';
+            alertDiv.innerHTML = `
+                <div class="alert-content">
+                    <div class="alert-title">${title}</div>
+                    <p>${message}</p>
+                    <button onclick="document.getElementById('custom-alert').remove()">باشە</button>
+                </div>
+            `;
+            document.body.appendChild(alertDiv);
+        };
 
         // ------------------ LLM TTS FEATURE ------------------
 
@@ -295,19 +403,54 @@
             }
         };
 
+        /**
+         * UPDATED: Handles linking an anonymous account, or merging if the Google credential is already in use.
+         */
         window.upgradeToGoogle = async () => {
             if (!auth.currentUser || !auth.currentUser.isAnonymous) {
                 alertMessage('هەڵە', 'تەنها بەکارهێنەرانی بێناو دەتوانن ئەکاونتیان بەرز بکەنەوە.');
                 return;
             }
+            
+            const provider = new GoogleAuthProvider();
+
             try {
-                const provider = new GoogleAuthProvider();
-                // This links the current anonymous user to a new Google account
+                // 1. Attempt to link the anonymous user to a new Google account
                 await linkWithPopup(auth.currentUser, provider);
                 alertMessage('بەرزکردنەوە سەرکەوتوو بوو', 'هەژماری بێناوی ئێستات بە سەرکەوتوویی بەستراوەتەوە بە گووگڵ.');
+                
             } catch (error) {
-                console.error("Account upgrade failed:", error);
-                alertMessage('هەڵەی بەستنەوە', `نەتوانرا ئەکاونتی گووگڵ ببەسترێتەوە: ${error.message}`);
+                
+                // 2. Handle the specific "credential already in use" error
+                if (error.code === 'auth/credential-already-in-use') {
+                    
+                    // Extract the Google credential the user just signed in with from the error object
+                    const googleCredential = GoogleAuthProvider.credentialFromError(error);
+                    
+                    if (!googleCredential) {
+                        alertMessage('هەڵەی بەستنەوە', 'گووگڵ نەیتوانی زانیاری هەژمارەکە بدۆزێتەوە.');
+                        return;
+                    }
+                    
+                    // 3. CRUCIAL STEP: Sign in with the credential to automatically merge the anonymous session 
+                    // with the existing persistent Google account.
+                    try {
+                        await signInWithCredential(auth, googleCredential);
+
+                        alertMessage(
+                            'بەرزکردنەوەی سەرکەوتوو (یەکخرا)', 
+                            'بە سەرکەوتوویی لەگەڵ هەژماری گووگڵی کۆنەکەتدا یەکخرایەوە.'
+                        );
+                    } catch (mergeError) {
+                         console.error("Error during account merge:", mergeError);
+                         alertMessage('هەڵەی یەکخستنەوە', `نەتوانرا هەژمارەکان یەکبخرێنەوە: ${mergeError.message}`);
+                    }
+
+                } else {
+                    // 4. Handle all other errors (e.g., user closing the popup, network issues)
+                    console.error("Account upgrade failed:", error);
+                    alertMessage('هەڵەی گشتی بەستنەوە', `نەتوانرا ئەکاونتی گووگڵ ببەسترێتەوە: ${error.message}`);
+                }
             }
         };
         
@@ -323,7 +466,7 @@
 
                     // --- FIX: Correctly manage Header Buttons based on user type ---
                     if (isAnonymous) {
-                        // Anonymous User: Show Upgrade, Hide Logout, Hide History
+                        // Anonymous User: Show Upgrade (now blue), Hide Logout, Hide History
                         logoutButton.style.display = 'none';
                         upgradeButton.style.display = 'flex';
                         toggleHistoryButton(false); 
@@ -351,6 +494,7 @@
         }
 
         function showAuthScreen(show) {
+            // NOTE: We rely on CSS to hide/show, but use JS to control which one is visible for the animation
             authContainer.style.display = show ? 'flex' : 'none';
             chatContainer.style.display = show ? 'none' : 'flex';
         }
@@ -405,6 +549,8 @@
                 console.error("Error loading chat history:", error);
             });
         }
+
+        window.loadChatHistory = loadChatHistory; // Make history function global
 
 
         // ------------------ GEMINI CHAT LOGIC ------------------
@@ -621,12 +767,14 @@
     <style>
         /* General Setup - Apple-like Aesthetics */
         :root {
-            --primary-ios-blue: #007AFF;
-            --background-light: #F2F2F7; /* Light gray background */
+            /* UPDATED COLOR PALETTE FOR BLACK/GREY THEME */
+            --primary-ios-black: #000000; /* New primary color */
+            --primary-ios-dark-grey: #4A4A4A; /* New primary text/icon color */
+            --background-light: #F2F2F7;
             --card-background: #FFFFFF;
-            --text-dark: #1D1D1F; /* Dark gray for text */
+            --text-dark: #1D1D1F;
             --border-color: #D1D1D6;
-            --bubble-ai: #E5E5EA; /* Light gray received bubble */
+            --bubble-ai: #E5E5EA; 
             --subtle-gray: #6D6D72;
             --warning-red: #FF3B30;
         }
@@ -642,6 +790,24 @@
             color: var(--text-dark);
             font-weight: 500; 
         }
+        
+        /* ------------------ NEW ANIMATION STYLES ------------------ */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-on-load {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        /* -------------------------------------------------------- */
+
 
         /* Custom Alert Modal */
         .custom-alert {
@@ -680,7 +846,8 @@
         }
 
         .alert-content button {
-            background-color: var(--primary-ios-blue);
+            /* Changed from blue to dark grey */
+            background-color: var(--primary-ios-dark-grey); 
             color: white;
             border: none;
             padding: 10px 20px;
@@ -698,7 +865,7 @@
         /* Container Styles - WIDER DESKTOP VIEW */
         .chat-container, .auth-container {
             width: 95%; 
-            max-width: 1200px; /* Increased maximum width for desktop */
+            max-width: 1200px; 
             height: 100%;
             background-color: var(--card-background);
             border-radius: 16px;
@@ -726,16 +893,57 @@
             align-items: center;
             padding: 30px;
             text-align: center;
+            opacity: 0; /* Starts hidden for animation */
         }
-
         .auth-card {
-            background-color: var(--card-background) /* The rest of the CSS continues here... */
-            /* ... (omitted for brevity, assume the original CSS continues correctly) ... */
+            background-color: var(--card-background);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
         }
-        
-        /* ... (The rest of the original CSS) ... */
+        .auth-card h2 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 30px;
+        }
+        .auth-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 12px 20px;
+            margin-bottom: 15px;
+            /* Default button style */
+            border: 2px solid var(--primary-ios-dark-grey); /* Grey border */
+            background-color: white;
+            color: var(--text-dark);
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            direction: rtl;
+        }
+        .auth-button:hover {
+            background-color: var(--background-light);
+        }
+        .auth-button .google-icon {
+            width: 24px;
+            height: 24px;
+            margin-left: 10px;
+            margin-right: 0;
+        }
+        .auth-button.anon {
+            /* Anonymous Button is dark gray */
+            background-color: var(--primary-ios-dark-grey);
+            color: white;
+            border-color: var(--primary-ios-dark-grey);
+        }
 
-        /* Header */
+        /* Chat Layout */
         .header {
             display: flex;
             justify-content: space-between;
@@ -747,66 +955,67 @@
             top: 0;
             z-index: 10;
         }
-
         .header-title {
             font-size: 20px;
             font-weight: 600;
         }
-
         .header-actions {
             display: flex;
             gap: 10px;
+            align-items: center;
         }
-
         .header-button {
             display: flex;
             align-items: center;
-            gap: 5px;
+            justify-content: center;
             padding: 8px 12px;
-            border-radius: 8px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             transition: background-color 0.2s;
-            border: none;
-            white-space: nowrap;
+            /* Default text color is dark grey */
+            color: var(--primary-ios-dark-grey);
+            background-color: transparent;
+        }
+        .header-button:hover {
+            background-color: #F0F0F0;
+        }
+        
+        /* NEW BLUE UPGRADE BUTTON STYLE */
+        .header-button.upgrade-google {
+            /* Force blue text and border */
+            color: #1565C0 !important;
+            border: 1px solid #1565C0 !important; 
+            background-color: transparent !important;
+        }
+        .header-button.upgrade-google:hover {
+            background-color: rgba(21, 101, 192, 0.1) !important;
+        }
+        
+        .header-button i {
+            font-size: 20px;
+            margin-left: 5px;
         }
 
-        #logout-button, #load-history-button {
-            background-color: var(--primary-ios-blue);
-            color: white;
-        }
-        #logout-button:hover, #load-history-button:hover {
-            background-color: #0056b3;
-        }
-
-        #upgrade-button {
-            background-color: var(--warning-red);
-            color: white;
-        }
-        #upgrade-button:hover {
-            background-color: #c0392b;
-        }
-
-        /* Chat Area */
+        /* Message Area */
         #message-area {
             flex-grow: 1;
-            padding: 20px;
             overflow-y: auto;
+            padding: 20px;
             display: flex;
             flex-direction: column;
-            direction: rtl; /* For Arabic/Kurdish content alignment */
-            align-items: flex-start;
+            gap: 15px;
         }
 
         /* Message Bubbles */
         .message {
-            display: flex;
-            align-items: flex-end;
-            margin-bottom: 15px;
             max-width: 80%;
-            direction: ltr; /* Reset text direction within bubbles */
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
         }
-
         .message .icon {
             width: 30px;
             height: 30px;
@@ -815,15 +1024,12 @@
             justify-content: center;
             align-items: center;
             font-size: 18px;
-            margin: 0 5px;
-            flex-shrink: 0;
-        }
-
-        .message.ai .icon {
-            background-color: var(--primary-ios-blue);
+            /* Icon color kept as dark grey for the chat interface */
+            background-color: var(--primary-ios-dark-grey);
             color: white;
+            flex-shrink: 0;
+            margin-top: 5px;
         }
-
         .message.user .icon {
             background-color: var(--subtle-gray);
             color: white;
@@ -832,144 +1038,102 @@
         .text-content {
             padding: 10px 15px;
             border-radius: 18px;
-            line-height: 1.4;
+            line-height: 1.5;
             text-align: right;
-            direction: rtl;
+            word-wrap: break-word;
+        }
+
+        .message.user .text-content {
+            /* User message bubble is black */
+            background-color: var(--primary-ios-black);
+            color: white;
+            border-top-left-radius: 18px;
+            border-top-right-radius: 18px;
+            border-bottom-left-radius: 18px;
+            border-bottom-right-radius: 4px; 
         }
 
         .message.ai .ai-bubble-content {
             display: flex;
             flex-direction: column;
             align-items: flex-end;
-            gap: 5px;
         }
 
         .message.ai .text-content {
             background-color: var(--bubble-ai);
             color: var(--text-dark);
-            border-top-right-radius: 2px;
+            border-top-left-radius: 18px;
+            border-top-right-radius: 18px;
+            border-bottom-right-radius: 18px;
+            border-bottom-left-radius: 4px; 
         }
-
-        .message.user .text-content {
-            background-color: var(--primary-ios-blue);
-            color: white;
-            border-top-left-radius: 2px;
+        
+        .tts-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: none;
+            border: none;
+            /* TTS button text/icon color is dark grey */
+            color: var(--primary-ios-dark-grey); 
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 5px;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        .tts-button:hover {
+            background-color: rgba(74, 74, 74, 0.1); 
+        }
+        .tts-button i {
+            font-size: 18px;
+            margin-left: 5px;
         }
 
         /* Input Area */
         .input-area {
-            display: flex;
-            padding: 10px 20px;
+            padding: 10px 15px;
             border-top: 1px solid var(--border-color);
-            background-color: var(--card-background);
-            align-items: flex-end;
+            display: flex;
+            align-items: center;
             gap: 10px;
-            direction: rtl; 
+            background-color: #fff;
         }
-
         #user-input {
             flex-grow: 1;
-            padding: 10px 15px;
+            padding: 10px;
             border: 1px solid var(--border-color);
-            border-radius: 18px;
+            border-radius: 20px;
             font-size: 16px;
-            min-height: 20px;
-            max-height: 150px;
-            overflow-y: auto;
             resize: none;
-            direction: rtl;
-            text-align: right;
-            transition: border-color 0.2s;
+            height: 40px; 
+            max-height: 100px;
+            overflow-y: auto;
+            direction: rtl; 
         }
-        #user-input:focus {
-            outline: none;
-            border-color: var(--primary-ios-blue);
-            box-shadow: 0 0 0 1px var(--primary-ios-blue);
-        }
-
         #send-button {
-            width: 40px;
-            height: 40px;
-            background-color: var(--primary-ios-blue);
+            /* Send button is black */
+            background-color: var(--primary-ios-black);
             color: white;
             border: none;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
-            cursor: pointer;
             display: flex;
             justify-content: center;
             align-items: center;
-            transition: background-color 0.2s, opacity 0.2s;
+            cursor: pointer;
+            transition: background-color 0.2s;
             flex-shrink: 0;
-        }
-        #send-button:hover:not(:disabled) {
-            background-color: #0056b3;
         }
         #send-button:disabled {
             background-color: var(--border-color);
             cursor: not-allowed;
         }
 
-        /* Auth Button Styles */
-        .auth-card button {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            width: 100%;
-            padding: 15px;
-            margin-top: 15px;
-            border-radius: 12px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s, opacity 0.2s;
-        }
-
-        .google-sign-in {
-            background-color: #4285F4;
-            color: white;
-            border: none;
-        }
-        .google-sign-in:hover {
-            background-color: #357ae8;
-        }
-
-        .anonymous-sign-in {
-            background-color: #F8F8F8;
-            color: var(--text-dark);
-            border: 1px solid var(--border-color);
-        }
-        .anonymous-sign-in:hover {
-            background-color: #EFEFEF;
-        }
-
-        .google-icon {
-            width: 20px;
-            height: 20px;
-        }
-
-        .tts-button {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            padding: 5px 10px;
-            border-radius: 15px;
-            border: 1px solid var(--primary-ios-blue);
-            background-color: white;
-            color: var(--primary-ios-blue);
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .tts-button:hover:not(:disabled) {
-            background-color: #f0f0f5;
-        }
-        .tts-button:disabled {
-            opacity: 0.6;
-            cursor: wait;
-        }
-
+        /* Rotating Icon for loading */
         .rotating-icon {
             animation: rotate 1s linear infinite;
         }
@@ -979,65 +1143,52 @@
         }
     </style>
 </head>
-<body class="dir-rtl">
-    
-    <div id="auth-container" class="auth-container" style="display: none;">
-        <div class="auth-card">
-            <div id="google-icon-placeholder" class="mb-4"></div>
-            <h2>بەخێربێیت بۆ ئیئایی کوردی جێمینی</h2>
-            <p>تکایە هەژمارێک هەڵبژێرە بۆ بەردەوامبوون:</p>
-            <div id="auth-error" class="text-warning-red text-center"></div>
+<body>
 
-            <button onclick="signInWithGoogle()" class="google-sign-in">
-                چوونەژوورەوە بە گووگڵ
-                <i class="material-icons" style="margin-right: -10px;">login</i>
-            </button>
-            
-            <button onclick="signInAnonymouslyUser()" class="anonymous-sign-in">
-                چوونەژوورەوەی بێناو (چاتی کاتی)
-                <i class="material-icons" style="margin-right: -10px;">person_outline</i>
-            </button>
-            <p class="mt-4 text-sm text-subtle-gray">
-                چوونەژوورەوەی بێناو مێژووی چات ناپارێزێت. دەتوانیت دواتر ئەکاونتەکەت بەرز بکەیتەوە.
-            </p>
-        </div>
-    </div>
-
-    <div id="chat-container" class="chat-container" style="display: none;">
-        
+    <div id="chat-container" class="chat-container animate-on-load">
         <div class="header">
-            <div class="header-title">ئیئایی کوردی (جێمینی)</div>
             <div class="header-actions">
-                <button id="load-history-button" class="header-button" style="display: none;">
-                    <i class="material-icons">history</i>
-                    مێژوو
+                <button id="logout-button" onclick="logout()" class="header-button" style="display: none;">
+                    <i class="material-icons">logout</i> چوونەدەرەوە
                 </button>
-                <button id="upgrade-button" class="header-button" onclick="upgradeToGoogle()" style="display: none;">
-                    <i class="material-icons">upgrade</i>
-                    بەرزکردنەوە بۆ گووگڵ
+                <button id="upgrade-button" onclick="upgradeToGoogle()" class="header-button upgrade-google" style="display: none;">
+                    <i class="material-icons">person_add</i> بەرزکردنەوە بۆ گووگڵ
                 </button>
-                <button id="logout-button" class="header-button" onclick="logout()" style="display: none;">
-                    <i class="material-icons">logout</i>
-                    چوونەدەرەوە
+                <button id="load-history-button" onclick="loadChatHistory()" class="header-button" style="display: none;">
+                    <i class="material-icons">history</i> مێژوو
                 </button>
             </div>
+            <div class="header-title">ئیئایی کوردی (جێمینی)</div>
         </div>
 
-        <div id="message-area" class="message-area">
+        <div id="message-area">
             </div>
 
         <div class="input-area">
-            <textarea id="user-input" placeholder="نامەکەت بنووسە لێرە..." rows="1"></textarea>
             <button id="send-button" disabled>
                 <i class="material-icons">send</i>
             </button>
+            <textarea id="user-input" placeholder="پەیامەکەت بنووسە..." rows="1" disabled></textarea>
         </div>
+        <div id="user-id-display" class="p-2 text-xs text-center text-gray-500">ناسنامەی بەکارهێنەر: بێناو</div>
+    </div>
 
-        <div class="footer text-center p-2 text-xs text-gray-500">
-            <span id="user-id-display">ناسنامەی بەکارهێنەر: بێناو</span> |
-            <a href="#" target="_blank" class="text-primary-ios-blue hover:underline">مافی بەکارهێنان</a>
+    <div id="auth-container" class="auth-container animate-on-load" style="display: flex;">
+        <div class="auth-card">
+            <h2>بەخێربێیت بۆ ئیئایی کوردی</h2>
+            <div id="auth-error" class="text-red-500 mb-4 font-bold"></div>
+            <button onclick="signInWithGoogle()" class="auth-button">
+                <div id="google-icon-placeholder"></div>
+                چوونەژوورەوە بە گووگڵ
+            </button>
+            <button onclick="signInAnonymouslyUser()" class="auth-button anon">
+                <i class="material-icons" style="margin-left: 10px;">visibility_off</i>
+                بە بێناوی بەردەوام بە (مێژوو پارێزراو نییە)
+            </button>
         </div>
     </div>
+
+    <div id="alertContainer"></div>
 
 </body>
 </html>
