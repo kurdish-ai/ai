@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ئیئایی کوردی - Gemini Chat</title>
+    <!-- FAVICON: The sun emoji (☀️), symbolizing light/knowledge and a central element of the Kurdish identity. -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☀️</text></svg>">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,15 +13,15 @@
         :root {
             --primary-black: #000000;
             --secondary-gray: #4A4A4A;
-            --primary-blue: #007AFF; /* Used for the new link style */
-            --background-light: #F2F2F7; /* Light gray background */
+            --primary-blue: #007AFF; 
+            --background-light: #F2F2F7; 
             --card-background: #FFFFFF;
-            --text-dark: #1D1D1F; /* Dark gray for text */
+            --text-dark: #1D1D1F; 
             --border-color: #D1D1D6;
-            --bubble-ai: #E5E5EA; /* Light gray received bubble */
+            --bubble-ai: #E5E5EA; 
             --subtle-gray: #6D6D72;
             --warning-red: #FF3B30;
-            --chat-bubble-user: #1A1A1A; /* Dark gray/black for user bubble */
+            --chat-bubble-user: #1A1A1A; 
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
@@ -30,7 +31,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            height: 100vh;
+            height: 100vh; /* Use full viewport height */
             color: var(--text-dark);
             font-weight: 500; 
         }
@@ -87,10 +88,11 @@
             opacity: 0.9;
         }
 
-        /* Container Styles - WIDER DESKTOP VIEW */
+        /* --- RESPONSIVE CONTAINER STYLES --- */
+        /* Default/PC/Desktop View (>= 801px) */
         .chat-container, .auth-container {
             width: 95%; 
-            max-width: 1200px; /* Increased maximum width for desktop */
+            max-width: 1200px; /* Max width on large screens */
             height: 100%;
             background-color: var(--card-background);
             border-radius: 16px;
@@ -101,16 +103,19 @@
             margin-top: 15px;
             margin-bottom: 15px;
         }
-        /* Mobile-specific styles (<= 800px) */
+        
+        /* Mobile View (Viewport width <= 800px) */
         @media (max-width: 800px) {
             .chat-container, .auth-container {
                 max-width: 100%; 
                 width: 100%;
-                border-radius: 0;
+                border-radius: 0; /* Full screen, no rounded corners */
                 margin: 0;
-                box-shadow: none;
+                box-shadow: none; /* No shadow for a native app feel */
             }
         }
+        /* --- END RESPONSIVE CONTAINER STYLES --- */
+
 
         /* AUTH SCREEN STYLES */
         .auth-container {
@@ -148,7 +153,6 @@
             cursor: pointer;
             font-size: 17px; 
             font-weight: 600; 
-            /* **SMOOTH ANIMATION CHANGE** */
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
         }
 
@@ -161,25 +165,23 @@
         }
         
         .auth-button:hover {
-            /* **SMOOTH ANIMATION CHANGE** */
             opacity: 0.95; 
-            transform: translateY(-5px); 
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2); 
+            transform: translateY(-2px); 
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); 
         }
         .auth-button:active {
-            /* **SMOOTH ANIMATION CHANGE** */
-            transform: translateY(-1px); 
+            transform: translateY(0); 
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); 
         }
 
         .google-btn {
-            background-color: var(--primary-black); /* BLACK */ 
+            background-color: var(--primary-black); 
             color: white;
             margin-bottom: 30px; 
         }
         
         .anonymous-btn {
-            background-color: var(--secondary-gray); /* DARK GRAY */
+            background-color: var(--secondary-gray); 
             color: white;
             border: 1px solid var(--primary-black);
         }
@@ -233,7 +235,23 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            /* Ensure actions wrap nicely on small screens if they overflow */
+            flex-wrap: wrap; 
+            justify-content: flex-start;
         }
+        
+        /* Adjust layout for very small screens */
+        @media (max-width: 450px) {
+            .header-actions {
+                width: 100%;
+                margin-top: 10px;
+            }
+            .header {
+                flex-direction: column;
+                align-items: flex-end; /* Keep main title right-aligned */
+            }
+        }
+
 
         .header-button {
             display: flex;
@@ -245,6 +263,8 @@
             cursor: pointer;
             transition: background-color 0.2s;
             border: none;
+            /* Make buttons take full width of container if layout forces them to wrap */
+            flex-grow: 1; 
         }
         
         /* Link Google Button Styling */
@@ -256,6 +276,7 @@
             text-decoration: underline; 
             font-weight: 500; 
             transition: color 0.2s;
+            flex-grow: 0; /* Do not force underline button to take full width */
         }
         #upgrade-button:hover {
             opacity: 1; 
@@ -367,7 +388,6 @@
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.2s;
             width: fit-content;
             align-self: flex-start; 
         }
@@ -473,7 +493,7 @@
         
         // ------------------ FIREBASE IMPORTS ------------------
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, linkWithPopup } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut, linkWithPopup, signInWithCredential } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, query, onSnapshot, addDoc, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // ------------------ GLOBAL VARIABLES FROM ENVIRONMENT ------------------
@@ -489,7 +509,7 @@
         // ------------------ GEMINI SETUP ------------------
         import { GoogleGenAI } from "https://esm.run/@google/genai";
         // WARNING: Replace this with a secure API key handling method in production!
-        const apiKey = "AIzaSyDNc6-bEE5GpFt5uq_nTkQKAZPXjuKiXSw"; 
+        const apiKey = "AIzaSyDNc6-bEE5GpFt5uq_nTkQKAZPXjuKiSxx"; 
         let chat = null;
 
         // ------------------ UI ELEMENTS ------------------
@@ -570,7 +590,7 @@
         }
 
 
-        // Custom function to replace alert() (left unchanged)
+        // Custom function to replace alert()
         function alertMessage(title, message) {
             const existingAlert = document.getElementById('custom-alert');
             if (existingAlert) existingAlert.remove();
@@ -734,24 +754,56 @@
             }
         };
 
+        /**
+         * Attempts to link an anonymous account to Google, handling the credential-already-in-use error.
+         */
         window.upgradeToGoogle = async () => {
             if (!auth.currentUser || !auth.currentUser.isAnonymous) {
                 alertMessage('هەڵە', 'تەنها بەکارهێنەرانی بێناو دەتوانن ئەکاونتیان بەرز بکەنەوە.');
                 return;
             }
+
             try {
                 const provider = new GoogleAuthProvider();
-                // This links the current anonymous user to a new Google account
+                // 1. Attempt to link the current anonymous user to a new Google account
                 await linkWithPopup(auth.currentUser, provider);
                 alertMessage('بەستنەوە سەرکەوتوو بوو', 'هەژماری بێناوی ئێستات بە سەرکەوتوویی بەستراوەتەوە بە گووگڵ.');
+                
             } catch (error) {
                 console.error("Account upgrade failed:", error);
-                alertMessage('هەڵەی بەستنەوە', `نەتوانرا ئەکاونتی گووگڵ ببەسترێتەوە: ${error.message}`);
+
+                // Check for the specific error: auth/credential-already-in-use
+                if (error.code === 'auth/credential-already-in-use' && error.credential) {
+                    
+                    // 2. The credential is used by another existing account.
+                    const credential = error.credential;
+                    
+                    try {
+                        // 3. Sign the user in with the conflicting credential. This effectively 
+                        //    migrates the session from the anonymous account to the persistent account.
+                        await signInWithCredential(auth, credential);
+                        
+                        alertMessage(
+                            'لینککردن و چوونەژوورەوە سەرکەوتوو بوو',
+                            'ئەم ئەکاونتەی گووگڵ پێشتر بەکارهاتبوو. ئێستا بە سەرکەوتوویی چوویتە ژوورەوە و چیتر بێناو نیت.'
+                        );
+                    } catch (signInError) {
+                         console.error("Failed to sign in with conflicting credential:", signInError);
+                         alertMessage(
+                            'هەڵەی بەستنەوە', 
+                            `نەتوانرا ئەکاونتە بەستراوەکە بەکار بهێنرێت بۆ چوونەژوورەوە: ${signInError.message}`
+                        );
+                    }
+                    
+                } else {
+                    // Handle other errors (e.g., popup closed, network error)
+                    alertMessage('هەڵەی بەستنەوە', `نەتوانرا ئەکاونتی گووگڵ ببەسترێتەوە: ${error.message}`);
+                }
             }
         };
         
         /**
-         * Checks if the user is a persistent user (i.e., NOT anonymous).
+         * Checks if the user is a persistent user (i.e., NOT anonymous). This includes Google users.
          */
         function isPersistentUser(user) {
             return user && !user.isAnonymous;
@@ -764,22 +816,37 @@
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     userId = user.uid;
-                    userIdDisplay.textContent = `ناسنامەی بەکارهێنەر: ${userId}`; 
                     showAuthScreen(false);
                     
                     const isAnonymous = user.isAnonymous;
                     const isPersistent = isPersistentUser(user);
+                    
+                    // --- UPDATED LOGIC FOR USER DISPLAY ---
+                    if (isPersistent && user.email) {
+                        userIdDisplay.textContent = `چوونەژوورەوە بە: ${user.email} (بەردەوام)`;
+                    } else if (isAnonymous) {
+                        // For anonymous users, show the ID and status
+                        userIdDisplay.textContent = `ناسنامەی بەکارهێنەر: ${userId} (بێناو)`;
+                    } else {
+                         // Fallback for other persistent types
+                        userIdDisplay.textContent = `ناسنامەی بەکارهێنەر: ${userId} (بەردەوام)`;
+                    }
+                    // --- END UPDATED LOGIC ---
+
 
                     // Manage Header Buttons based on persistence
                     if (isPersistent) {
+                        // User is signed in with Google (or another persistent method)
                         logoutButton.style.display = 'flex';
                         upgradeButton.style.display = 'none';
                         toggleHistoryButton(true); 
                     } else if (isAnonymous) {
+                        // User is signed in anonymously
                         logoutButton.style.display = 'none';
                         upgradeButton.style.display = 'flex'; 
                         toggleHistoryButton(false); 
                     } else {
+                        // Fallback 
                         logoutButton.style.display = 'flex';
                         upgradeButton.style.display = 'none';
                         toggleHistoryButton(true);
@@ -793,6 +860,7 @@
 
                 } else {
                     userId = null;
+                    // Reset to the default message when logged out
                     userIdDisplay.textContent = 'ناسنامەی بەکارهێنەر: بێناو';
                     showAuthScreen(true);
                     
@@ -881,13 +949,16 @@
             sendButton.disabled = false;
             inputField.focus();
 
-            const isPersistent = isPersistentUser(user);
+            const isPersistent = isPersistentUser(auth.currentUser);
             
             // Set up history button only if authorized (Persistent user: Google, Custom, etc.)
             if (db && isPersistent) {
                 loadHistoryButton.onclick = loadChatHistory; 
                 // Automatically load history on login for persistent users
+                loadHistoryButton.style.display = 'flex'; // Ensure button visibility is set here too
                 loadChatHistory();
+            } else {
+                 loadHistoryButton.style.display = 'none'; // Hide for anonymous
             }
 
             sendButton.onclick = sendMessage;
@@ -964,7 +1035,7 @@
             inputField.disabled = true;
             sendButton.disabled = true;
 
-            // 1.5. SAVE USER MESSAGE TO FIRESTORE (Only for persistent users)
+            // 1.5. SAVE USER MESSAGE TO FIRESTORE (Only for persistent users, e.g., Google users)
             if (userId && db && isPersistent) {
                  try {
                      await addDoc(getChatCollectionRef(), {
@@ -1062,10 +1133,12 @@
 </head>
 <body>
 
+    <!-- Authentication Screen (Hidden by default, shown when logged out) -->
     <div id="auth-container" class="auth-container" style="display: none;">
         <div class="auth-card">
             <h2>چوونەژوورەوە بۆ ئیئایی کوردی</h2>
             
+            <!-- Google Sign-In -->
             <button id="google-sign-in" onclick="signInWithGoogle()" class="auth-button google-btn">
                 چوونەژوورەوە بە گووگڵ
                 <span id="google-icon-placeholder"></span>
@@ -1073,6 +1146,7 @@
 
             <div class="separator">یاخود</div>
             
+            <!-- Anonymous Sign-In -->
             <button id="anonymous-sign-in" onclick="signInAnonymouslyUser()" class="auth-button anonymous-btn">
                 بە بێناو بچۆ ژوورەوە (بێ پاشەکەوتی چات)
             </button>
@@ -1081,34 +1155,42 @@
     </div>
 
 
+    <!-- Chat Interface (Hidden by default, shown when logged in) -->
     <div id="chat-container" class="chat-container" style="display: none;">
         
+        <!-- Header/Toolbar -->
         <div class="header">
             <div class="title-group">
                 <h1>ئیئایی کوردی</h1>
                 <div class="icon">☀️</div>
             </div>
             <div class="header-actions">
-                <button id="upgrade-button" onclick="upgradeToGoogle()" class="header-button">
+                <!-- Link Google Button (Visible for Anonymous users) -->
+                <button id="upgrade-button" onclick="upgradeToGoogle()" class="header-button" style="display: none;">
                     <i class="material-icons">link</i>
                     بەستنەوە بە گووگڵ
                 </button>
                 
-                <button id="load-history-button" class="header-button">
+                <!-- Load History Button (Visible for Persistent users, including Google users) -->
+                <button id="load-history-button" class="header-button" style="display: none;">
                     <i class="material-icons">history</i>
                     بارکردنی مێژوو
                 </button>
 
-                <button id="logout-button" onclick="logout()" class="header-button">
+                <!-- Logout Button (Visible for Persistent users, including Google users) -->
+                <button id="logout-button" onclick="logout()" class="header-button" style="display: none;">
                     <i class="material-icons">logout</i>
                     چوونەدەرەوە
                 </button>
             </div>
         </div>
 
+        <!-- Message Display Area -->
         <div id="message-area" class="message-area">
-            </div>
+            <!-- Chat messages will be appended here by JavaScript -->
+        </div>
 
+        <!-- Input Area -->
         <div class="input-area">
             <textarea id="user-input" rows="1" placeholder="نامەکەت لێرە بنووسە..."></textarea>
             <button id="send-button" disabled>
@@ -1116,6 +1198,7 @@
             </button>
         </div>
         
+        <!-- Footer/Status Info -->
         <div class="footer-info">
             <span id="user-id-display">ناسنامەی بەکارهێنەر: بێناو</span> |
             <span>گەشەپێدراو لەگەڵ Gemini & Firebase</span>
