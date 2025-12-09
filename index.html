@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ckb" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>زیرەکی دەستکردی کوردی </title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☀️</text></svg>">
+    
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="./style.css" rel="stylesheet"> 
+    
+    <script type="module" src="./script.js"></script>
+    
+    <script type="module">
+        import "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    </script>
+</head>
+<body>
+    
+    <div id="auth-container" class="auth-container" style="display: flex;">
+        <div class="auth-card">
+            <h2>چوونەژوورەوە بۆ زیرەکی دەستکردی کوردی</h2>
+            
+            <button id="google-sign-in" onclick="signInWithGoogle()" class="auth-button google-btn">
+                چوونەژوورەوە/تۆمارکردن بە گووگڵ
+                <span id="google-icon-placeholder"></span>
+            </button>
+
+            <div class="separator">یاخود</div>
+            
+            <button id="anonymous-sign-in" onclick="signInAnonymouslyUser()" class="auth-button anonymous-btn">
+                <i class="material-icons">person_off</i>
+                بە بێناو بچۆ ژوورەوە
+            </button>
+            <p id="auth-error" class="text-xs text-red-500 mt-2"></p>
+        </div>
+    </div>
+
+
+    <div id="chat-container" class="chat-container" style="display: none;">
+        
+        <div class="header">
+            <div class="title-group">
+                <h1>زیرەکی دەستکردی کوردی</h1>
+                <div class="icon">☀️</div>
+            </div>
+            <div class="header-actions">
+                
+                <button id="mode-toggle-button" onclick="toggleDarkMode()" class="header-button icon-only">
+                    <i id="mode-icon" class="material-icons">dark_mode</i>
+                </button>
+
+                <button id="new-chat-button" onclick="startNewChat()" class="header-button" style="display: none;">
+                    <i class="material-icons">add_box</i>
+                    چاتی نوێ
+                </button>
+
+                <button id="load-history-button" class="header-button" style="display: none;">
+                    <i class="material-icons">history</i>
+                    بارکردنی مێژوو
+                </button>
+                
+                <button id="upgrade-button" onclick="upgradeToGoogle()" class="header-button" style="display: none;">
+                    <i class="material-icons">link</i>
+                    بەستنەوە بە گووگڵ
+                </button>
+                
+                <button id="logout-button" onclick="logout()" class="header-button" style="display: none;">
+                    <i class="material-icons">logout</i>
+                    چوونەدەرەوە
+                </button>
+            </div>
+        </div>
+
+        <div id="message-area" class="message-area">
+            </div>
+
+        <div class="input-wrapper">
+            
+            <div id="image-preview-container" class="relative" style="display: none;">
+                <button id="remove-image-button" class="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow-md">
+                    <i class="material-icons text-red-500 text-lg">close</i>
+                </button>
+                <img id="image-preview" src="" alt="وێنەی بارکراو" class="rounded-lg object-cover max-h-32"/>
+                <span class="text-xs text-gray-500 mr-2">وێنەی بارکراو:</span>
+            </div>
+
+            <input type="file" accept="image/*" id="image-upload" hidden/> 
+
+            <div class="input-area">
+                
+                <button id="send-button">
+                    <i class="material-icons">send</i>
+                </button>
+
+                <textarea id="user-input" rows="1" placeholder="فەرمان یان نامە بنوسە..." autocomplete="off"></textarea>
+                
+                <button id="upload-button" onclick="document.getElementById('image-upload').click()" title="بارکردنی وێنە (بۆ شیکردنەوە/دەستکاریکردن)">
+                    <i class="material-icons">image</i>
+                </button>
+                
+            </div>
+        </div>
+        
+        <div class="footer-info">
+            <span id="user-id-display">ناسنامەی بەکارهێنەر: بێناو</span> |
+            <span>گەشەپێدراو لەگەڵ Gemini & Firebase</span>
+        </div>
+
+    </div>
+    <div id="custom-alert"></div>
+</body>
+</html>
