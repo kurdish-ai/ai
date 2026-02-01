@@ -11,7 +11,7 @@ app.use(express.json({ limit: '20mb' }));
 
 app.post('/api/chat', async (req, res) => {
     try {
-        const model = "gemini-3-flash-preview"; 
+        const model = "gemini-1.5-flash"; 
         const apiKey = process.env.GEMINI_API_KEY;
         
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -41,3 +41,4 @@ app.post('/api/chat', async (req, res) => {
 
 
 app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));
+
