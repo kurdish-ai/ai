@@ -1,49 +1,35 @@
-require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const axios = require('axios');
-const cors = require('cors');
-
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-const cors = require('cors');
-
-// Change app.use(cors()) to this:
+// 1. Configure CORS to allow your GitHub Pages site
 app.use(cors({
-    origin: 'https://kurdish-ai.github.io', // Allow your frontend
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    origin: 'https://kurdish-ai.github.io', 
+    methods: ['POST', 'GET', 'OPTIONS'],
+    allowedHeaders: ['Content-Type']
 }));
-app.use(express.json({ limit: '20mb' }));
+
+app.use(express.json());
+
+// 2. Handle the "Preflight" request manually (Crucial for Vercel)
+app.options('*', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', 'https://kurdish-ai.github.io');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.sendStatus(200);
+});
 
 app.post('/api/chat', async (req, res) => {
     try {
-        // Now using the valid Gemini 3 Flash Preview ID
         const model = "gemini-3-flash-preview"; 
         const apiKey = process.env.GEMINI_API_KEY;
-        
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-        const payload = {
-            contents: req.body.contents,
-            system_instruction: {
-                parts: [{ 
-                    text: "وەڵامەکانت زۆر کورت و پوخت بن. لە کۆتایی هەموو وەڵامێکدا ئەم رستەیە بنوسە: 'ئایا وەڵامێکی درێژترت دەوێت؟'" 
-                }]
-            }
-        };
-
-        const response = await axios.post(url, payload, {
-            headers: { 'Content-Type': 'application/json' }
-        });
-
+        const response = await axios.post(url, req.body);
         res.json(response.data);
     } catch (error) {
-        console.error("Gemini API Error:", error.response ? error.response.data : error.message);
-        res.status(500).json({ 
-            error: "API Error", 
-            details: error.response ? error.response.data : error.message 
-        });
+        res.status(500).json({ error: error.message });
     }
 });
 
