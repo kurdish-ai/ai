@@ -7,9 +7,7 @@
     {
       "source": "/api/:path*",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "https://kurdish-ai.github.io" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,POST" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
+        { "key": "Access-Control-Allow-Origin", "value": "https://kurdish-ai.github.io" }
       ]
     }
   ]
