@@ -6,7 +6,14 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+const cors = require('cors');
+
+// Change app.use(cors()) to this:
+app.use(cors({
+    origin: 'https://kurdish-ai.github.io', // Allow your frontend
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json({ limit: '20mb' }));
 
 app.post('/api/chat', async (req, res) => {
