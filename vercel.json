@@ -1,5 +1,9 @@
 {
   "version": 2,
+  "rewrites": [
+    { "source": "/api/chat", "destination": "/api/index.js" },
+    { "source": "/api/(.*)", "destination": "/api/index.js" }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
@@ -10,8 +14,5 @@
         { "key": "Access-Control-Allow-Headers", "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version" }
       ]
     }
-  ],
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" }
   ]
 }
