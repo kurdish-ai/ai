@@ -1,4 +1,4 @@
-const BACKEND_URL = 'https://your-project-name.vercel.app/api/chat';
+const BACKEND_URL = 'ai-82vsvfjb4-kurdish-ai-9782s-projects.vercel.app';
 
 const firebaseConfig = {
     apiKey: "AIzaSyDoTAMAuFm8h9RFWk_C4BnqtwEis-RGor4",
@@ -212,3 +212,4 @@ document.getElementById('mode-toggle-button').addEventListener('click', () => {
     document.body.classList.toggle('dark-mode');
 
 });
+
