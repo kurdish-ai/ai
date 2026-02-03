@@ -15,7 +15,9 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // 2. Explicitly handle the "OPTIONS" preflight request
-app.options('*', cors(corsOptions));
+app.options('/*path', (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', 'https://kurdish-ai.github.io');
+    res.sendStatus(200)
 
 app.post('/api/chat', async (req, res) => {
     try {
