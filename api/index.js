@@ -17,6 +17,11 @@ app.use(express.json());
 // 2. Explicitly handle the "OPTIONS" preflight request
 app.options('/*path', (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', 'https://kurdish-ai.github.io');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.sendStatus(200);
+});
+    res.setHeader('Access-Control-Allow-Origin', 'https://kurdish-ai.github.io');
     res.sendStatus(200)
 
 app.post('/api/chat', async (req, res) => {
