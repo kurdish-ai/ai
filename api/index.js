@@ -3,48 +3,49 @@ const cors = require('cors');
 const axios = require('axios');
 const app = express();
 
-// 1. Setup CORS with the '200 OK' fix for preflights
+// 1. CORS Configuration
 const corsOptions = {
     origin: 'https://kurdish-ai.github.io',
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    optionsSuccessStatus: 200 // CRITICAL: This fixes the "No HTTP ok status" error
+    optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// 2. Explicitly handle the "OPTIONS" preflight request
-app.options('/*path', (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', 'https://kurdish-ai.github.io');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.sendStatus(200);
-});
-    res.setHeader('Access-Control-Allow-Origin', 'https://kurdish-ai.github.io');
-    res.sendStatus(200)
+// 2. FIXED: Named Wildcard for Express 5 (The fix for your PathError)
+app.options('/*path', cors(corsOptions));
 
+// 3. Chat Route
 app.post('/api/chat', async (req, res) => {
     try {
-        const model = "gemini-3-flash-preview"; 
         const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({ error: "API Key missing in Vercel settings." });
+        }
+
+        const model = "gemini-3-flash-preview"; 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-        // Gemini 3 Flash supports "thinking_config" for better reasoning
-        const payload = {
-            contents: req.body.contents,
-            thinking_config: {
-                include_thoughts: true // Enables the new 2026 agentic reasoning
-            }
-        };
+        // Forward the request to Google Gemini
+        const response = await axios.post(url, req.body, {
+            headers: { 'Content-Type': 'application/json' }
+        });
 
-        const response = await axios.post(url, payload);
         res.json(response.data);
     } catch (error) {
-        console.error("API Error:", error.response?.data || error.message);
-        res.status(500).json({ error: "Server Error", details: error.message });
+        console.error("Gemini Error:", error.response?.data || error.message);
+        res.status(500).json({ 
+            error: "AI Connection Failed", 
+            details: error.response?.data || error.message 
+        });
     }
 });
 
-// Export for Vercel
+// 4. Test Route to check if server is alive
+app.get('/api/test', (req, res) => {
+    res.json({ status: "Server is running!", model: "Gemini 3 Flash" });
+});
+
 module.exports = app;
