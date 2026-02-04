@@ -3,32 +3,34 @@ const cors = require('cors');
 const axios = require('axios');
 const app = express();
 
-// 1. CORS Configuration
+// 1. Allow GitHub Pages to talk to this server
 const corsOptions = {
-    origin: 'https://kurdish-ai.github.io',
+    origin: 'https://kurdish-ai.github.io', // Your Frontend
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    optionsSuccessStatus: 200
+    credentials: true,
+    optionsSuccessStatus: 200 // Fixes the "Not HTTP ok status" error
 };
 
+// Apply CORS to everything
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// 2. FIXED: Named Wildcard for Express 5 (The fix for your PathError)
-app.options('/*path', cors(corsOptions));
+// 2. Explicitly handle the Preflight (OPTIONS) request
+// (In Express 4, '*' works perfectly fine)
+app.options('*', cors(corsOptions));
 
-// 3. Chat Route
+// 3. The Chat Route
 app.post('/api/chat', async (req, res) => {
     try {
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
-            return res.status(500).json({ error: "API Key missing in Vercel settings." });
+            return res.status(500).json({ error: "API Key is missing in Vercel settings" });
         }
 
-        const model = "gemini-3-flash-preview"; 
+        const model = "gemini-3-flash-preview";
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-        // Forward the request to Google Gemini
         const response = await axios.post(url, req.body, {
             headers: { 'Content-Type': 'application/json' }
         });
@@ -37,15 +39,13 @@ app.post('/api/chat', async (req, res) => {
     } catch (error) {
         console.error("Gemini Error:", error.response?.data || error.message);
         res.status(500).json({ 
-            error: "AI Connection Failed", 
+            error: "Failed to fetch from AI", 
             details: error.response?.data || error.message 
         });
     }
 });
 
-// 4. Test Route to check if server is alive
-app.get('/api/test', (req, res) => {
-    res.json({ status: "Server is running!", model: "Gemini 3 Flash" });
-});
+// Test route to verify server is running
+app.get('/', (req, res) => res.send("Server is Running!"));
 
 module.exports = app;
