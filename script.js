@@ -30,26 +30,34 @@ let currentImageBase64 = null;
 let currentImageMime = null;
 let chatHistory = []; 
 
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerText = message;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 500);
+    }, 3000);
+}
+
 function addMessage(role, text, imageUrl = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${role}`; 
-    
     const iconLabel = role === 'ai' ? '🤖' : 'ت';
-    
     let contentHtml = text;
     if (imageUrl) {
         contentHtml = `<img src="${imageUrl}" class="message-image" />` + contentHtml;
     }
-
     contentHtml = contentHtml.replace(/\n/g, '<br>');
-
     messageDiv.innerHTML = `
         <div class="icon">${iconLabel}</div>
         <div class="${role === 'ai' ? 'ai-bubble-content' : 'text-content'}">
             ${contentHtml}
         </div>
     `;
-    
     messageArea.appendChild(messageDiv);
     messageArea.scrollTop = messageArea.scrollHeight; 
 }
@@ -58,7 +66,6 @@ function addLoadingBubble() {
     const loadingDiv = document.createElement('div');
     loadingDiv.className = 'message ai loading-message'; 
     loadingDiv.id = 'loading-indicator';
-    
     loadingDiv.innerHTML = `
         <div class="icon">🤖</div>
         <div class="loading-bubble-chat">
@@ -69,26 +76,20 @@ function addLoadingBubble() {
             </div>
         </div>
     `;
-    
     messageArea.appendChild(loadingDiv);
     messageArea.scrollTop = messageArea.scrollHeight;
 }
 
 function removeLoadingBubble() {
     const loadingDiv = document.getElementById('loading-indicator');
-    if (loadingDiv) {
-        loadingDiv.remove();
-    }
+    if (loadingDiv) loadingDiv.remove();
 }
 
 async function sendMessage() {
     const text = userInput.value.trim();
-    
     if (!text && !currentImageBase64) return;
-
     const displayImage = currentImageBase64 ? `data:${currentImageMime};base64,${currentImageBase64}` : null;
     addMessage('user', text, displayImage);
-    
     const userParts = [];
     if (text) userParts.push({ text: text });
     if (currentImageBase64) {
@@ -99,46 +100,33 @@ async function sendMessage() {
             }
         });
     }
-
     chatHistory.push({ role: "user", parts: userParts });
-
     userInput.value = '';
     imagePreviewContainer.style.display = 'none';
     currentImageBase64 = null;
     currentImageMime = null;
     imageUploadInput.value = '';
-
     addLoadingBubble();
-
     try {
         const response = await fetch(BACKEND_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                contents: chatHistory 
-            })
+            body: JSON.stringify({ contents: chatHistory })
         });
-
         const data = await response.json();
-        
         removeLoadingBubble();
-
         if (data.error) {
-             addMessage('ai', "Error: " + JSON.stringify(data.error));
+             showToast("هەڵەیەک ڕوویدا لە سێرڤەر", "error");
         } else if (data.candidates && data.candidates[0].content) {
             const aiText = data.candidates[0].content.parts[0].text;
-            
             chatHistory.push({ role: "model", parts: [{ text: aiText }] });
-            
             addMessage('ai', aiText);
         } else {
             addMessage('ai', "ببورە، وەڵامێکی نادیار هات.");
         }
-
     } catch (error) {
-        console.error(error);
         removeLoadingBubble();
-        addMessage('ai', "ببورە، کێشەیەک لە پەیوەندی دروست بوو لەگەڵ سێرڤەر.");
+        showToast("کێشەی پەیوەندی بە سێرڤەرەوە هەیە", "error");
     }
 }
 
@@ -147,7 +135,6 @@ uploadButton.addEventListener('click', () => imageUploadInput.click());
 imageUploadInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
         imagePreview.src = event.target.result;
@@ -171,7 +158,6 @@ onAuthStateChanged(auth, (user) => {
         chatContainer.style.display = 'flex';
         document.getElementById('user-id-display').innerText = 
             user.isAnonymous ? "ناسنامەی بەکارهێنەر: بێناو" : `ناسنامەی بەکارهێنەر: ${user.displayName || user.email}`;
-            
         if (messageArea.children.length === 0) {
             addMessage('ai', "بەخێربێیت! من زیرەکی دەستکردی کوردی 🤖، چۆن دەتوانم یارمەتیت بدەم؟");
         }
@@ -183,21 +169,29 @@ onAuthStateChanged(auth, (user) => {
 });
 
 document.getElementById('google-login-btn').addEventListener('click', () => {
-    signInWithPopup(auth, new GoogleAuthProvider()).catch(err => document.getElementById('auth-error').innerText = err.message);
+    signInWithPopup(auth, new GoogleAuthProvider())
+        .then(() => showToast("بە سەرکەوتوویی چوویتە ژوورەوە", "info"))
+        .catch(err => showToast("هەڵە لە چوونەژوورەوە", "error"));
 });
 
 document.getElementById('anonymous-login-btn').addEventListener('click', () => {
-    signInAnonymously(auth).catch(err => document.getElementById('auth-error').innerText = err.message);
+    signInAnonymously(auth)
+        .then(() => showToast("بە بێناو چوویتە ژوورەوە", "info"))
+        .catch(err => showToast("هەڵە لە چوونەژوورەوە", "error"));
 });
 
 document.getElementById('logout-button').addEventListener('click', () => {
-    signOut(auth).then(() => location.reload());
+    signOut(auth).then(() => {
+        showToast("چوویتە دەرەوە", "info");
+        setTimeout(() => location.reload(), 1000);
+    });
 });
 
 document.getElementById('new-chat-button').addEventListener('click', () => { 
     messageArea.innerHTML = ''; 
     chatHistory = []; 
     addMessage('ai', "چاتی نوێ دەستی پێکرد. فەرموو!");
+    showToast("چاتی نوێ پاککرایەوە", "info");
 });
 
 sendButton.addEventListener('click', sendMessage);
@@ -210,8 +204,8 @@ userInput.addEventListener('keydown', (e) => {
 
 document.getElementById('mode-toggle-button').addEventListener('click', () => {
     document.body.classList.toggle('dark-mode');
-
 });
+
 
 
 
